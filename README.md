@@ -56,7 +56,6 @@ Para `video.mp4`, se puede crear un archivo `video.json` en la misma carpeta:
 ```json
 {
   "title": "Título del vídeo",
-  "description": "Descripción",
   "description": "Descripción opcional. Si se omite, se genera automáticamente.",
   "tags": ["etiqueta adicional"],
   "hashtags": ["bachata", "música latina"],

@@ -34,7 +34,8 @@ class SettingsDialog(tk.Toplevel):
         super().__init__(parent)
         self.parent = parent
         self.title("Configuración")
-        self.resizable(False, False)
+        self.resizable(True, True)
+        self.minsize(700, 600)
         self.transient(parent)
         self.grab_set()
 
@@ -47,7 +48,7 @@ class SettingsDialog(tk.Toplevel):
         self.channel_var = tk.StringVar(value=config.channel_name)
         self.hashtags_var = tk.StringVar(value=", ".join(config.default_hashtags))
         self.tags_var = tk.StringVar(value=", ".join(config.default_tags))
-        self.geometry("760x760")
+        self.geometry("780x660")
 
         frame = ttk.Frame(self, padding=14)
         frame.pack(fill="both", expand=True)

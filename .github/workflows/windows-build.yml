@@ -26,7 +26,7 @@ jobs:
       - name: Run tests
         run: pytest -q
       - name: Lint
-        run: ruff check src tests
+        run: ruff check --select E4,E7,E9,F src tests
 
   windows:
     name: Build portable Windows executable

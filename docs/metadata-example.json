@@ -1,0 +1,9 @@
+{
+  "title": "Título del vídeo (máximo 100 caracteres)",
+  "description": "Descripción del vídeo",
+  "tags": ["senderismo", "naturaleza", "España"],
+  "category_id": "22",
+  "language": "es",
+  "privacy_status": "public",
+  "thumbnail_path": "miniatura.jpg"
+}

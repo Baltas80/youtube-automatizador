@@ -44,6 +44,10 @@ class SettingsDialog(tk.Toplevel):
         self.privacy_var = tk.StringVar(value=config.default_privacy)
         self.auto_var = tk.BooleanVar(value=config.auto_start_watching)
         self.startup_var = tk.BooleanVar(value=config.start_with_windows)
+        self.channel_var = tk.StringVar(value=config.channel_name)
+        self.hashtags_var = tk.StringVar(value=", ".join(config.default_hashtags))
+        self.tags_var = tk.StringVar(value=", ".join(config.default_tags))
+        self.geometry("760x760")
 
         frame = ttk.Frame(self, padding=14)
         frame.pack(fill="both", expand=True)
@@ -80,8 +84,38 @@ class SettingsDialog(tk.Toplevel):
             variable=self.startup_var
         ).grid(row=7, column=0, sticky="w", pady=(0, 12))
 
+        ttk.Label(frame, text="Nombre del canal usado en las descripciones").grid(
+            row=8, column=0, sticky="w"
+        )
+        ttk.Entry(frame, textvariable=self.channel_var).grid(
+            row=9, column=0, sticky="ew", pady=(3, 9)
+        )
+        ttk.Label(frame, text="Hashtags predeterminados (separados por comas)").grid(
+            row=10, column=0, sticky="w"
+        )
+        ttk.Entry(frame, textvariable=self.hashtags_var).grid(
+            row=11, column=0, sticky="ew", pady=(3, 9)
+        )
+        ttk.Label(frame, text="Etiquetas de YouTube predeterminadas (separadas por comas)").grid(
+            row=12, column=0, sticky="w"
+        )
+        ttk.Entry(frame, textvariable=self.tags_var).grid(
+            row=13, column=0, sticky="ew", pady=(3, 9)
+        )
+        ttk.Label(
+            frame,
+            text="Plantilla de descripción. Variables disponibles: {title}, {channel}, {hashtags}",
+        ).grid(row=14, column=0, sticky="w")
+        self.template_text = tk.Text(frame, height=6, width=82, wrap="word")
+        self.template_text.grid(row=15, column=0, sticky="ew", pady=(3, 4))
+        self.template_text.insert("1.0", config.description_template)
+        ttk.Label(
+            frame,
+            text="La app genera descripciones y hashtags localmente. No utiliza IA ni servicios externos.",
+        ).grid(row=16, column=0, sticky="w", pady=(0, 10))
+
         buttons = ttk.Frame(frame)
-        buttons.grid(row=8, column=0, sticky="e")
+        buttons.grid(row=17, column=0, sticky="e")
         ttk.Button(buttons, text="Cancelar", command=self.destroy).pack(side="right")
         ttk.Button(buttons, text="Guardar", command=self._save).pack(side="right", padx=(0, 8))
 
@@ -107,6 +141,21 @@ class SettingsDialog(tk.Toplevel):
         self.parent.config.default_privacy = self.privacy_var.get()
         self.parent.config.auto_start_watching = self.auto_var.get()
         self.parent.config.start_with_windows = self.startup_var.get()
+        self.parent.config.channel_name = self.channel_var.get().strip() or "tu canal"
+        self.parent.config.default_hashtags = [
+            item.strip().lstrip("#") for item in self.hashtags_var.get().split(",") if item.strip()
+        ]
+        self.parent.config.default_tags = [
+            item.strip() for item in self.tags_var.get().split(",") if item.strip()
+        ]
+        self.parent.config.description_template = self.template_text.get("1.0", "end").strip()
+        if len(self.parent.config.description_template) > 4500:
+            messagebox.showerror(
+                "Plantilla",
+                "La plantilla es demasiado larga. Reduce el texto para dejar espacio a los metadatos.",
+                parent=self,
+            )
+            return
         try:
             from .windows_startup import set_startup
 
@@ -134,7 +183,14 @@ class VideoDialog(tk.Toplevel):
         self.transient(parent)
         self.grab_set()
 
-        defaults = metadata_for_file(self.video_path, parent.config.default_privacy)
+        defaults = metadata_for_file(
+            self.video_path,
+            default_privacy=parent.config.default_privacy,
+            description_template=parent.config.description_template,
+            channel_name=parent.config.channel_name,
+            default_hashtags=parent.config.default_hashtags,
+            default_tags=parent.config.default_tags,
+        )
         self.title_var = tk.StringVar(value=defaults["title"])
         self.tags_var = tk.StringVar(value=", ".join(defaults["tags"]))
         self.privacy_var = tk.StringVar(value=defaults["privacy_status"])
@@ -411,6 +467,10 @@ class MainWindow(tk.Tk):
                 on_error=lambda message: self._emit("warning", message),
                 interval_seconds=self.config.scan_interval_seconds,
                 stable_scans=self.config.stable_scans,
+                description_template=self.config.description_template,
+                channel_name=self.config.channel_name,
+                default_hashtags=self.config.default_hashtags,
+                default_tags=self.config.default_tags,
             )
             self.watcher.start()
             self.watch_button.configure(text="Detener vigilancia")
@@ -548,6 +608,8 @@ class MainWindow(tk.Tk):
                 if kind == "connected":
                     channel = args[0]
                     self.channel_label.configure(text=f"Canal: {channel['channel_title']}")
+                    self.config.channel_name = channel["channel_title"]
+                    save_config(self.config)
                     self._set_status(
                         f"Conectado a {channel['channel_title']} ({channel['channel_id']})."
                     )

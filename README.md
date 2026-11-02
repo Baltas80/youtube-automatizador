@@ -12,7 +12,9 @@ Aplicación de escritorio ligera para Windows que vigila una carpeta, mantiene u
 - Subida reanudable de 8 MB por bloque, progreso y reintentos.
 - Conservación de tareas interrumpidas; exige comprobar YouTube Studio antes de reintentar para evitar duplicados.
 - Publicación inmediata o programación mediante `status.publishAt`.
-- Metadatos por vídeo mediante formulario o archivo JSON lateral.
+- Generación local y automática de descripciones, hashtags y etiquetas de YouTube a partir del título.
+- Plantillas, nombre del canal y hashtags predeterminados configurables.
+- Metadatos por vídeo mediante formulario o archivo JSON lateral; los valores indicados expresamente tienen prioridad.
 - Compilación automática de un ejecutable Windows x64 en GitHub Actions.
 
 ## Requisitos de Google / YouTube
@@ -35,6 +37,18 @@ Fuentes oficiales: [videos.insert](https://developers.google.com/youtube/data/re
 
 No subas el JSON OAuth ni tokens al repositorio. Los tokens se guardan en Windows Credential Manager.
 
+## Descripción y hashtags automáticos (sin IA ni costes externos)
+
+La aplicación genera metadatos localmente, sin llamadas de red adicionales. Usa el título del archivo, las palabras configuradas y una plantilla editable desde **Configuración**. La plantilla admite:
+
+- `{title}`: título del vídeo.
+- `{channel}`: nombre del canal.
+- `{hashtags}`: hashtags generados y sin duplicados.
+
+La configuración inicial incluye términos de bachata y música latina para Proyecto NeoLatino. Se pueden cambiar en cualquier momento. Las etiquetas de YouTube también se generan automáticamente y se pueden ampliar mediante metadatos laterales.
+
+Si se escribe una descripción en el JSON, se conserva y se completan los hashtags que falten. La generación es determinista y basada en reglas: no analiza el audio ni el contenido visual, por lo que conviene revisar los resultados antes de activar subidas públicas desatendidas.
+
 ## Metadatos para la carpeta vigilada
 
 Para `video.mp4`, se puede crear un archivo `video.json` en la misma carpeta:
@@ -43,10 +57,12 @@ Para `video.mp4`, se puede crear un archivo `video.json` en la misma carpeta:
 {
   "title": "Título del vídeo",
   "description": "Descripción",
-  "tags": ["senderismo", "naturaleza"],
-  "category_id": "22",
+  "description": "Descripción opcional. Si se omite, se genera automáticamente.",
+  "tags": ["etiqueta adicional"],
+  "hashtags": ["bachata", "música latina"],
+  "category_id": "10",
   "language": "es",
-  "privacy_status": "public",
+  "privacy_status": "private",
   "thumbnail_path": "video.jpg"
 }
 ```
@@ -84,6 +100,7 @@ El ejecutable portable para Windows x64 se genera como artefacto de GitHub Actio
 - No se guardan credenciales en Git.
 - El token OAuth se almacena en Windows Credential Manager.
 - Los vídeos originales no se borran ni se mueven automáticamente.
+- Las descripciones, hashtags y etiquetas se generan localmente; no se envían títulos ni vídeos a servicios externos de IA.
 - La cola y el estado de los trabajos persisten en SQLite. Si el proceso se interrumpe durante una subida, el trabajo queda en estado «Interrumpido» y exige comprobación manual antes de reintentar.
 - Se detectan duplicados mediante SHA-256.
 - Las subidas interrumpidas se recuperan como trabajos pendientes de reintento.

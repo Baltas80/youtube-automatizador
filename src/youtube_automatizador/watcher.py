@@ -18,6 +18,10 @@ class FolderWatcher:
         on_error: Callable[[str], None],
         interval_seconds: int = 10,
         stable_scans: int = 3,
+        description_template: str = "",
+        channel_name: str = "Proyecto NeoLatino",
+        default_hashtags: list[str] | None = None,
+        default_tags: list[str] | None = None,
     ):
         self.folder = Path(folder)
         self.store = store
@@ -26,6 +30,10 @@ class FolderWatcher:
         self.on_error = on_error
         self.interval_seconds = max(5, interval_seconds)
         self.stable_scans = max(2, stable_scans)
+        self.description_template = description_template
+        self.channel_name = channel_name
+        self.default_hashtags = default_hashtags
+        self.default_tags = default_tags
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._observed: dict[str, tuple[int, float, int]] = {}
@@ -91,7 +99,14 @@ class FolderWatcher:
                     continue
 
                 try:
-                    metadata = metadata_for_file(path, self.default_privacy)
+                    metadata = metadata_for_file(
+                        path,
+                        default_privacy=self.default_privacy,
+                        description_template=self.description_template,
+                        channel_name=self.channel_name,
+                        default_hashtags=self.default_hashtags,
+                        default_tags=self.default_tags,
+                    )
                     job_id, created = self.store.add_job(metadata)
                     self.store.mark_watch_version(key, stat.st_size, stat.st_mtime, sidecar_mtime)
                     self.on_job(job_id, created, path.name)

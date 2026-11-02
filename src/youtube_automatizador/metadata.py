@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .content import DEFAULT_DESCRIPTION_TEMPLATE, build_video_content
+
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm", ".mpeg", ".mpg"}
 
 
@@ -18,7 +20,14 @@ def parse_datetime(value: str) -> datetime:
     return result.astimezone(timezone.utc)
 
 
-def metadata_for_file(video_path: str | Path, default_privacy: str = "public") -> dict[str, Any]:
+def metadata_for_file(
+    video_path: str | Path,
+    default_privacy: str = "private",
+    description_template: str = DEFAULT_DESCRIPTION_TEMPLATE,
+    channel_name: str = "Proyecto NeoLatino",
+    default_hashtags: list[str] | None = None,
+    default_tags: list[str] | None = None,
+) -> dict[str, Any]:
     path = Path(video_path)
     if path.suffix.lower() not in VIDEO_EXTENSIONS:
         raise ValueError(f"Formato de vídeo no admitido: {path.suffix or '(sin extensión)'}")
@@ -40,18 +49,26 @@ def metadata_for_file(video_path: str | Path, default_privacy: str = "public") -
         raise ValueError("El título no puede estar vacío.")
     if len(title) > 100:
         raise ValueError("El título supera el límite de 100 caracteres de YouTube.")
-    if len(description) > 5000:
-        raise ValueError("La descripción supera los 5000 caracteres permitidos.")
 
     tags_value = raw.get("tags") or []
     if isinstance(tags_value, str):
-        tags = [item.strip() for item in tags_value.split(",") if item.strip()]
+        supplied_tags = [item.strip() for item in tags_value.split(",") if item.strip()]
     elif isinstance(tags_value, list):
-        tags = [str(item).strip() for item in tags_value if str(item).strip()]
+        supplied_tags = [str(item).strip() for item in tags_value if str(item).strip()]
     else:
         raise ValueError("tags debe ser una lista de textos o una cadena separada por comas.")
 
-    privacy = str(raw.get("privacy_status") or default_privacy).lower()
+    final_description, hashtags, tags = build_video_content(
+        title,
+        description,
+        supplied_tags,
+        description_template=str(raw.get("description_template") or description_template),
+        channel_name=channel_name,
+        default_hashtags=raw.get("hashtags", default_hashtags),
+        default_tags=default_tags,
+    )
+
+    privacy = str(raw.get("privacy_status") or default_privacy or "private").lower()
     if privacy not in {"public", "unlisted", "private"}:
         raise ValueError("privacy_status debe ser public, unlisted o private.")
 
@@ -75,8 +92,9 @@ def metadata_for_file(video_path: str | Path, default_privacy: str = "public") -
     return {
         "file_path": str(path.resolve()),
         "title": title,
-        "description": description,
+        "description": final_description,
         "tags": tags,
+        "hashtags": hashtags,
         "category_id": category_id,
         "language": language,
         "privacy_status": privacy,

@@ -29,6 +29,7 @@ class YouTubeApi:
     def __init__(self):
         self._lock = threading.RLock()
         self._cached_service = None
+        self._cached_credentials = None
 
     def has_credentials(self) -> bool:
         import keyring
@@ -93,15 +94,27 @@ class YouTubeApi:
 
         with self._lock:
             if self._cached_service is None:
+                self._cached_credentials = self._credentials()
                 self._cached_service = build(
-                    "youtube", "v3", credentials=self._credentials(), cache_discovery=False
+                    "youtube", "v3", credentials=self._cached_credentials, cache_discovery=False
                 )
             return self._cached_service
+
+    def _persist_credentials(self) -> None:
+        if self._cached_credentials is None:
+            return
+        import keyring
+
+        keyring.set_password(
+            KEYRING_SERVICE, KEYRING_ACCOUNT, self._cached_credentials.to_json()
+        )
 
     def channel_info(self) -> dict[str, str]:
         try:
             response = self._service().channels().list(part="snippet", mine=True).execute()
+            self._persist_credentials()
         except Exception as exc:
+            self._persist_credentials()
             raise ApiUploadError(f"No se pudo consultar el canal de YouTube: {exc}") from exc
         items = response.get("items") or []
         if not items:
@@ -195,10 +208,21 @@ class YouTubeApi:
                     "manualmente cuando esté permitido."
                 )
 
-            final_status = "scheduled" if scheduled_at else "published"
-            if not scheduled_at and requested_privacy == "public" and actual_privacy == "private":
-                final_status = "uploaded_private"
+            if scheduled_at:
+                final_status = "scheduled"
+            else:
+                final_status = {
+                    "public": "published",
+                    "unlisted": "uploaded_unlisted",
+                    "private": "uploaded_private",
+                }.get(actual_privacy or requested_privacy, "published")
+            if not scheduled_at and actual_privacy and actual_privacy != requested_privacy:
+                warning = (warning + " | " if warning else "") + (
+                    f"YouTube devolvió privacidad '{actual_privacy}' aunque se solicitó "
+                    f"'{requested_privacy}'. Revisa el estado del vídeo en YouTube Studio."
+                )
 
+            self._persist_credentials()
             return {
                 "video_id": video_id,
                 "video_url": f"https://www.youtube.com/watch?v={video_id}",
@@ -220,7 +244,10 @@ class YouTubeApi:
             except Exception:
                 pass
 
-            quota_reasons = {"quotaExceeded", "dailyLimitExceeded", "userRateLimitExceeded"}
+            quota_reasons = {
+                "quotaExceeded", "dailyLimitExceeded", "userRateLimitExceeded",
+                "rateLimitExceeded", "dailyLimitExceededUnreg",
+            }
             retryable = exc.resp.status in {408, 429, 500, 502, 503, 504} or reason in quota_reasons
             retry_after = 24 * 60 * 60 if reason in quota_reasons else None
             raise ApiUploadError(

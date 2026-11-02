@@ -2,7 +2,7 @@ name: Windows build and tests
 
 on:
   push:
-    branches: [master, feature/first-functional-release]
+    branches: [feature/first-functional-release]
   pull_request:
     branches: [master]
   workflow_dispatch:

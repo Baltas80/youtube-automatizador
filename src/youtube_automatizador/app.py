@@ -24,6 +24,7 @@ STATUS_LABELS = {
     "published": "Publicado",
     "scheduled": "Programado",
     "uploaded_private": "Subido como privado",
+    "uploaded_unlisted": "Subido como oculto",
 }
 
 
@@ -527,7 +528,7 @@ class MainWindow(tk.Tk):
                     self._set_status("No se pudo conectar con YouTube.")
                     messagebox.showerror("Conexión con YouTube", args[0], parent=self)
                 elif kind == "new_job":
-                    job_id, created, name = args
+                    _job_id, created, name = args
                     self._set_status(
                         f"Añadido a la cola: {name}" if created
                         else f"Duplicado detectado, no se vuelve a subir: {name}"

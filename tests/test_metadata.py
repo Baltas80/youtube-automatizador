@@ -6,13 +6,16 @@ import pytest
 from youtube_automatizador.metadata import metadata_for_file, parse_datetime
 
 
-def test_metadata_defaults_to_filename_and_public(tmp_path):
+def test_metadata_defaults_to_filename_and_private_with_generated_description(tmp_path):
     video = tmp_path / "mi video.mp4"
     video.write_bytes(b"video")
     data = metadata_for_file(video)
     assert data["title"] == "mi video"
-    assert data["privacy_status"] == "public"
+    assert data["privacy_status"] == "private"
     assert data["scheduled_at"] is None
+    assert "mi video" in data["description"]
+    assert "#" in data["description"]
+    assert data["tags"]
 
 
 def test_sidecar_scheduling_forces_private(tmp_path):

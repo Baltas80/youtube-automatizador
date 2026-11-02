@@ -20,6 +20,7 @@ STATUS_LABELS = {
     "queued": "En cola",
     "uploading": "Subiendo",
     "retry_wait": "Reintento pendiente",
+    "interrupted": "Interrumpido — comprobar",
     "failed": "Error",
     "published": "Publicado",
     "scheduled": "Programado",
@@ -42,6 +43,7 @@ class SettingsDialog(tk.Toplevel):
         self.folder_var = tk.StringVar(value=config.watch_folder)
         self.privacy_var = tk.StringVar(value=config.default_privacy)
         self.auto_var = tk.BooleanVar(value=config.auto_start_watching)
+        self.startup_var = tk.BooleanVar(value=config.start_with_windows)
 
         frame = ttk.Frame(self, padding=14)
         frame.pack(fill="both", expand=True)
@@ -72,10 +74,14 @@ class SettingsDialog(tk.Toplevel):
         ttk.Checkbutton(
             frame, text="Iniciar la vigilancia automáticamente al abrir la aplicación",
             variable=self.auto_var
-        ).grid(row=6, column=0, sticky="w", pady=(0, 12))
+        ).grid(row=6, column=0, sticky="w", pady=(0, 5))
+        ttk.Checkbutton(
+            frame, text="Iniciar YouTube Automatizador al arrancar Windows",
+            variable=self.startup_var
+        ).grid(row=7, column=0, sticky="w", pady=(0, 12))
 
         buttons = ttk.Frame(frame)
-        buttons.grid(row=7, column=0, sticky="e")
+        buttons.grid(row=8, column=0, sticky="e")
         ttk.Button(buttons, text="Cancelar", command=self.destroy).pack(side="right")
         ttk.Button(buttons, text="Guardar", command=self._save).pack(side="right", padx=(0, 8))
 
@@ -100,6 +106,18 @@ class SettingsDialog(tk.Toplevel):
         self.parent.config.watch_folder = self.folder_var.get().strip()
         self.parent.config.default_privacy = self.privacy_var.get()
         self.parent.config.auto_start_watching = self.auto_var.get()
+        self.parent.config.start_with_windows = self.startup_var.get()
+        try:
+            from .windows_startup import set_startup
+
+            set_startup(self.startup_var.get())
+        except Exception as exc:
+            messagebox.showerror(
+                "Inicio de Windows",
+                f"No se pudo actualizar el inicio automático: {exc}",
+                parent=self,
+            )
+            return
         save_config(self.parent.config)
         self.parent._set_status("Configuración guardada.")
         self.destroy()
@@ -120,7 +138,16 @@ class VideoDialog(tk.Toplevel):
         self.title_var = tk.StringVar(value=defaults["title"])
         self.tags_var = tk.StringVar(value=", ".join(defaults["tags"]))
         self.privacy_var = tk.StringVar(value=defaults["privacy_status"])
-        self.schedule_var = tk.StringVar()
+        scheduled_default = defaults.get("scheduled_at")
+        schedule_display = ""
+        if scheduled_default:
+            try:
+                schedule_display = datetime.fromisoformat(scheduled_default).astimezone().strftime(
+                    "%Y-%m-%d %H:%M"
+                )
+            except ValueError:
+                schedule_display = ""
+        self.schedule_var = tk.StringVar(value=schedule_display)
         self.thumbnail_var = tk.StringVar(value=defaults.get("thumbnail_path") or "")
 
         container = ttk.Frame(self, padding=14)

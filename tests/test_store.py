@@ -43,3 +43,17 @@ def test_watch_version_detects_changed_sidecar(tmp_path):
     store.mark_watch_version(path, 12, 1.0, 2.0)
     assert store.has_watch_version(path, 12, 1.0, 2.0)
     assert not store.has_watch_version(path, 12, 1.0, 3.0)
+
+
+
+def test_interrupted_upload_requires_explicit_retry(tmp_path):
+    store = JobStore(tmp_path / "queue.sqlite3")
+    job_id, _ = store.add_job(make_video(tmp_path))
+    store.mark_uploading(job_id)
+    # Simulate the process restarting while this job was in flight.
+    reopened = JobStore(tmp_path / "queue.sqlite3")
+    job = next(item for item in reopened.list_jobs() if item["id"] == job_id)
+    assert job["status"] == "interrupted"
+    assert reopened.next_job() is None
+    assert reopened.retry_job(job_id) is True
+    assert reopened.next_job()["id"] == job_id

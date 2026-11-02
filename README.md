@@ -10,7 +10,7 @@ Aplicación de escritorio ligera para Windows que vigila una carpeta, mantiene u
 - Vigilancia periódica de una carpeta y detección de archivos terminados.
 - Cola SQLite persistente, huella SHA-256 y prevención de duplicados.
 - Subida reanudable de 8 MB por bloque, progreso y reintentos.
-- Recuperación de tareas interrumpidas tras cerrar Windows o la aplicación.
+- Conservación de tareas interrumpidas; exige comprobar YouTube Studio antes de reintentar para evitar duplicados.
 - Publicación inmediata o programación mediante `status.publishAt`.
 - Metadatos por vídeo mediante formulario o archivo JSON lateral.
 - Compilación automática de un ejecutable Windows x64 en GitHub Actions.
@@ -31,7 +31,7 @@ Fuentes oficiales: [videos.insert](https://developers.google.com/youtube/data/re
 2. Configura la pantalla de consentimiento OAuth.
 3. Crea un cliente OAuth de tipo **Desktop app** y descarga el JSON.
 4. Abre la aplicación, pulsa **Conectar con YouTube** y selecciona el JSON.
-5. Selecciona una carpeta y activa **Iniciar vigilancia**.
+5. Selecciona una carpeta y activa **Iniciar vigilancia**. En Configuración puedes activar el inicio con Windows y la vigilancia automática al abrir la aplicación.
 
 No subas el JSON OAuth ni tokens al repositorio. Los tokens se guardan en Windows Credential Manager.
 
@@ -77,14 +77,14 @@ pytest -q
 python -m youtube_automatizador
 ```
 
-El ejecutable portable para Windows x64 se genera como artefacto de GitHub Actions en cada push a la rama principal o a la rama de desarrollo. No requiere tener Python instalado para ejecutarlo.
+El ejecutable portable para Windows x64 se genera como artefacto de GitHub Actions en cada push a la rama de desarrollo. No requiere tener Python instalado para ejecutarlo. Para subir automáticamente tras reiniciar Windows, activa tanto «Iniciar YouTube Automatizador al arrancar Windows» como «Iniciar la vigilancia automáticamente».
 
 ## Seguridad y comportamiento
 
 - No se guardan credenciales en Git.
 - El token OAuth se almacena en Windows Credential Manager.
 - Los vídeos originales no se borran ni se mueven automáticamente.
-- La cola y el estado de los trabajos persisten en SQLite.
+- La cola y el estado de los trabajos persisten en SQLite. Si el proceso se interrumpe durante una subida, el trabajo queda en estado «Interrumpido» y exige comprobación manual antes de reintentar.
 - Se detectan duplicados mediante SHA-256.
 - Las subidas interrumpidas se recuperan como trabajos pendientes de reintento.
 - Los fallos de cuota se esperan 24 horas antes del siguiente intento automático.

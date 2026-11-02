@@ -4,9 +4,10 @@ import hashlib
 import json
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 
 def utc_now() -> str:
@@ -27,12 +28,20 @@ class JobStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.path, timeout=30)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA foreign_keys=ON")
-        return connection
+        try:
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
     def _initialize(self) -> None:
         with self._connect() as db:
@@ -74,12 +83,13 @@ class JobStore:
                 );
                 """
             )
-            # Requeue uploads interrupted by a process/Windows shutdown.
+            # An interrupted upload may have reached YouTube even if the response was lost.
+            # Require a manual check in Studio before retrying, to avoid accidental duplicates.
             db.execute(
-                """UPDATE jobs SET status='retry_wait', next_retry_at=?, 
-                   error='La aplicación se cerró durante la subida; se reintentará.',
+                """UPDATE jobs SET status='interrupted', next_retry_at=NULL,
+                   error='La aplicación se cerró durante la subida. Comprueba YouTube Studio antes de reintentar.',
                    updated_at=? WHERE status='uploading'""",
-                (utc_now(), utc_now()),
+                (utc_now(),),
             )
 
     def has_watch_version(
@@ -192,9 +202,7 @@ class JobStore:
             should_retry = retryable and attempts < max_attempts
             if should_retry:
                 delay = retry_after_seconds or min(3600, 30 * (2 ** max(0, attempts - 1)))
-                next_time = datetime.fromtimestamp(
-                    datetime.now(timezone.utc).timestamp() + delay, timezone.utc
-                ).isoformat()
+                next_time = (datetime.now(timezone.utc) + timedelta(seconds=delay)).isoformat()
                 status = "retry_wait"
             else:
                 next_time = None
@@ -208,7 +216,7 @@ class JobStore:
         with self._connect() as db:
             cursor = db.execute(
                 """UPDATE jobs SET status='queued',attempts=0,next_retry_at=NULL,
-                   error=NULL,updated_at=? WHERE id=? AND status IN ('failed','retry_wait')""",
+                   error=NULL,updated_at=? WHERE id=? AND status IN ('failed','retry_wait','interrupted')""",
                 (utc_now(), job_id),
             )
         return cursor.rowcount == 1

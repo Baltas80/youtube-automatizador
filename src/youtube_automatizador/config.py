@@ -20,6 +20,7 @@ class AppConfig:
     stable_scans: int = 3
     default_privacy: str = "public"
     auto_start_watching: bool = False
+    start_with_windows: bool = False
 
     @classmethod
     def from_dict(cls, raw: dict) -> "AppConfig":

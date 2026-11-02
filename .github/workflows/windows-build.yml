@@ -1,0 +1,58 @@
+name: Windows build and tests
+
+on:
+  push:
+    branches: [master, feature/first-functional-release]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Run tests
+        run: pytest -q
+      - name: Lint
+        run: ruff check src tests
+
+  windows:
+    name: Build portable Windows executable
+    runs-on: windows-latest
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Build executable
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --windowed --name YouTubeAutomatizador --paths src --collect-all keyring --collect-all googleapiclient --hidden-import keyring.backends.Windows src/main.py
+      - name: Package
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/YouTubeAutomatizador/* -DestinationPath YouTubeAutomatizador-Windows-x64.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YouTubeAutomatizador-Windows-x64
+          path: YouTubeAutomatizador-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
